@@ -1,9 +1,8 @@
 name: Create GitHub Release
 
 on:
-  push:
-    tags:
-      - 'v*.*.*' 
+  repository_dispatch:
+    types: [create-release]
 
 jobs:
   release:
@@ -27,7 +26,7 @@ jobs:
         id: create_release
         uses: actions/create-release@v1
         with:
-          tag_name: ${{ github.ref }} 
+          tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
