@@ -39,6 +39,6 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v3
         with:
-          name: myapp-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: kubecnf-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ./bin/kubecnf_${{ matrix.goos }}_${{ matrix.goarch }}
 
