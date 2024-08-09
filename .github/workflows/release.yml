@@ -1,0 +1,52 @@
+name: Create GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' 
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download binaries (Linux amd64)
+        uses: actions/download-artifact@v3
+        with:
+          name: kubecnf-linux-amd64
+          path: ./bin
+
+      - name: Download binaries (Darwin arm64)
+        uses: actions/download-artifact@v3
+        with:
+          name: kubecnf-darwin-arm64
+          path: ./bin
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref }} 
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Release Assets (Linux amd64)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./bin/kubecnf_linux_amd64
+          asset_name: kubecnf_linux_amd64
+          asset_content_type: application/octet-stream
+
+      - name: Upload Release Assets (Darwin arm64)
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./bin/kubecnf_darwin_arm64
+          asset_name: kubecnf_darwin_arm64
+          asset_content_type: application/octet-stream
+
