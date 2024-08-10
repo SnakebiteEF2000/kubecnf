@@ -31,7 +31,7 @@ kubecnf [-c /path/to/main/config] rollback
 To enable bash completion, source the provided completion script:
 
 ```
-source /path/to/kubecnf-completion.bash
+source <(kubecnf completion)
 ```
 
 To make it permanent, add the above line to your `~/.bashrc` file.
@@ -49,4 +49,3 @@ To make it permanent, add the above line to your `~/.bashrc` file.
    ```
 
 Alternatively, you can download the pre-built binary directly from the GitHub [release page](https://github.com/SnakebiteEF2000/kubecnf/releases) rename it and move it to your PATH as shown above.
-

@@ -18,9 +18,7 @@ var addCommand = &cli.Command{
 		mainConfigPath := expandPath(c.String("config"))
 		newConfigPath := c.Args().First()
 
-		// Check if the main config file exists
 		if _, err := os.Stat(mainConfigPath); os.IsNotExist(err) {
-			// If it doesn't exist, create it from the input file
 			fmt.Printf("Main config file not found at %s. Creating it from the input file...\n", mainConfigPath)
 			if err := createConfigFromFile(mainConfigPath, newConfigPath); err != nil {
 				return fmt.Errorf("failed to create main config file: %v", err)
@@ -29,7 +27,6 @@ var addCommand = &cli.Command{
 			return nil
 		}
 
-		// If the main config file exists, proceed with adding the new config
 		return addClusterConfig(mainConfigPath, newConfigPath)
 	},
 }
@@ -41,6 +38,7 @@ var removeCommand = &cli.Command{
 	Action: func(c *cli.Context) error {
 		if c.NArg() < 1 {
 			return fmt.Errorf("cluster name is required")
+
 		}
 		mainConfigPath := expandPath(c.String("config"))
 		clusterName := c.Args().First()
@@ -74,6 +72,15 @@ var rollbackCommand = &cli.Command{
 	Action: func(c *cli.Context) error {
 		mainConfigPath := expandPath(c.String("config"))
 		return rollbackConfig(mainConfigPath)
+	},
+}
+
+var completionCommand = &cli.Command{
+	Name:  "completion",
+	Usage: "output shell completion code",
+	Action: func(c *cli.Context) error {
+		fmt.Print(bashCompletionScript)
+		return nil
 	},
 }
 

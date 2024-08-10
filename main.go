@@ -25,9 +25,7 @@ func main() {
 			removeCommand,
 			listCommand,
 			rollbackCommand,
-		},
-		Before: func(c *cli.Context) error {
-			return setupBashCompletion()
+			completionCommand,
 		},
 	}
 
