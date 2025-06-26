@@ -1,5 +1,7 @@
 # kubecnf
 
+### This is fully vibe coded
+
 [![CI](https://github.com/SnakebiteEF2000/kubecnf/workflows/CI/badge.svg)](https://github.com/SnakebiteEF2000/kubecnf/actions/workflows/ci.yml)
 [![Release](https://github.com/SnakebiteEF2000/kubecnf/workflows/Release/badge.svg)](https://github.com/SnakebiteEF2000/kubecnf/actions/workflows/release.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/SnakebiteEF2000/kubecnf)](https://goreportcard.com/report/github.com/SnakebiteEF2000/kubecnf)
