@@ -108,11 +108,48 @@ var rollbackCommand = &cli.Command{
 }
 
 var completionCommand = &cli.Command{
-	Name:  "completion",
-	Usage: "output shell completion code",
+	Name:      "completion",
+	Usage:     "output shell completion code",
+	ArgsUsage: "<shell>",
+	Description: `Generate shell completion scripts for kubecnf.
+
+Supported shells:
+  bash    Generate bash completion script
+  zsh     Generate zsh completion script
+
+Examples:
+  # Generate bash completion
+  kubecnf completion bash
+
+  # Generate zsh completion  
+  kubecnf completion zsh
+
+  # Install bash completion (Linux)
+  kubecnf completion bash > /etc/bash_completion.d/kubecnf
+
+  # Install zsh completion (put in fpath)
+  kubecnf completion zsh > "${fpath[1]}/_kubecnf"`,
 	Action: func(c *cli.Context) error {
-		fmt.Print(bashCompletionScript)
+		if c.NArg() < 1 {
+			return fmt.Errorf("shell argument is required (bash or zsh)")
+		}
+
+		shell := c.Args().First()
+		switch shell {
+		case "bash":
+			fmt.Print(bashCompletionScript)
+		case "zsh":
+			fmt.Print(zshCompletionScript)
+		default:
+			return fmt.Errorf("unsupported shell: %s (supported: bash, zsh)", shell)
+		}
 		return nil
+	},
+	BashComplete: func(c *cli.Context) {
+		if c.NArg() == 0 {
+			fmt.Println("bash")
+			fmt.Println("zsh")
+		}
 	},
 }
 

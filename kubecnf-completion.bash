@@ -5,7 +5,7 @@ _kubecnf_completion() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="add remove rollback --help -h --config -c"
+    opts="add remove list rollback completion --help -h --config -c"
 
     case "${prev}" in
         kubecnf)
@@ -18,6 +18,10 @@ _kubecnf_completion() {
             ;;
         remove)
             COMPREPLY=( $(compgen -W "$(kubecnf remove --generate-bash-completion)" -- ${cur}) )
+            return 0
+            ;;
+        completion)
+            COMPREPLY=( $(compgen -W "bash zsh" -- ${cur}) )
             return 0
             ;;
         --config|-c)
