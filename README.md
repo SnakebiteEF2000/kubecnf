@@ -57,15 +57,44 @@ kubecnf [-c /path/to/main/config] list
 kubecnf [-c /path/to/main/config] rollback
 ```
 
-## Bash Completion
+## Shell Completion
 
-To enable bash completion, source the provided completion script:
+kubecnf supports completion for both bash and zsh shells.
 
-```
-source <(kubecnf completion)
+### Bash Completion
+
+To enable bash completion, source the completion script:
+
+```bash
+source <(kubecnf completion bash)
 ```
 
 To make it permanent, add the above line to your `~/.bashrc` file.
+
+Alternatively, install system-wide (requires sudo):
+```bash
+kubecnf completion bash | sudo tee /etc/bash_completion.d/kubecnf
+```
+
+### Zsh Completion
+
+To enable zsh completion, add the completion script to your fpath:
+
+```zsh
+# Add to ~/.zshrc
+kubecnf completion zsh > "${fpath[1]}/_kubecnf"
+```
+
+Or source it directly:
+```zsh
+source <(kubecnf completion zsh)
+```
+
+For Oh My Zsh users, you can place the completion file in the completions directory:
+```zsh
+mkdir -p ~/.oh-my-zsh/completions
+kubecnf completion zsh > ~/.oh-my-zsh/completions/_kubecnf
+```
 
 ## Installation
 
