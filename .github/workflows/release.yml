@@ -1,88 +1,188 @@
-name: Build and Release Go Binaries
+name: Release
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*.*.*'  # Triggers on version tags like v1.0.0
 
-jobs:
-  build:
-    name: Build Go binaries
-    runs-on: ubuntu-latest
+env:
+  GO_VERSION: '1.23'
 
+jobs:
+  # Run CI checks before releasing
+  ci:
+    name: CI Checks
+    uses: ./.github/workflows/ci.yml
+
+  # Create release and build binaries
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: ci
+    permissions:
+      contents: write
+    
     strategy:
       matrix:
-        goos: [linux, darwin]
-        goarch: [amd64, arm64]
-        exclude:
+        include:
+          - goos: linux
+            goarch: amd64
+            asset_name: kubecnf-linux-amd64
           - goos: linux
             goarch: arm64
+            asset_name: kubecnf-linux-arm64
           - goos: darwin
             goarch: amd64
+            asset_name: kubecnf-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            asset_name: kubecnf-darwin-arm64
+          - goos: windows
+            goarch: amd64
+            asset_name: kubecnf-windows-amd64.exe
+          - goos: freebsd
+            goarch: amd64
+            asset_name: kubecnf-freebsd-amd64
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for changelog
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.22.4'
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
 
-      - name: Build binary
-        run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ./bin/kubecnf_${{ matrix.goos }}_${{ matrix.goarch }}
+    - name: Get version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
 
-      - name: Upload binary
-        uses: actions/upload-artifact@v3
-        with:
-          name: kubecnf-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: ./bin/kubecnf_${{ matrix.goos }}_${{ matrix.goarch }}
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        # Build with version info
+        go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }} -X main.buildTime=$(date -u '+%Y-%m-%d_%H:%M:%S')" -o ${{ matrix.asset_name }}
 
-  release:
-    name: Create GitHub Release
+    - name: Create checksums
+      run: |
+        if command -v sha256sum >/dev/null 2>&1; then
+          sha256sum ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+        else
+          shasum -a 256 ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+        fi
+
+    - name: Upload to release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Create release if it doesn't exist
+        if ! gh release view ${{ steps.version.outputs.version }} >/dev/null 2>&1; then
+          gh release create ${{ steps.version.outputs.version }} \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --generate-notes \
+            --draft=false \
+            --prerelease=false
+        fi
+        
+        # Upload assets
+        gh release upload ${{ steps.version.outputs.version }} \
+          ${{ matrix.asset_name }} \
+          ${{ matrix.asset_name }}.sha256
+
+  # Create Docker image (optional)
+  docker:
+    name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: build
-
+    needs: ci
+    permissions:
+      contents: read
+      packages: write
+    
     steps:
-      - name: Download binaries (Linux amd64)
-        uses: actions/download-artifact@v3
-        with:
-          name: kubecnf-linux-amd64
-          path: ./bin
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Download binaries (Darwin arm64)
-        uses: actions/download-artifact@v3
-        with:
-          name: kubecnf-darwin-arm64
-          path: ./bin
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Release Assets (Linux amd64)
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./bin/kubecnf_linux_amd64
-          asset_name: kubecnf_linux_amd64
-          asset_content_type: application/octet-stream
+    - name: Get version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Upload Release Assets (Darwin arm64)
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./bin/kubecnf_darwin_arm64
-          asset_name: kubecnf_darwin_arm64
-          asset_content_type: application/octet-stream
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64,linux/arm64
+        tags: |
+          ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+          ghcr.io/${{ github.repository }}:latest
+        build-args: |
+          VERSION=${{ steps.version.outputs.version }}
+
+  # Create Homebrew formula (optional)
+  homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: release
+    if: ${{ !contains(github.ref, 'alpha') && !contains(github.ref, 'beta') && !contains(github.ref, 'rc') }}
+    
+    steps:
+    - name: Get version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Update Homebrew formula
+      env:
+        HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
+      run: |
+        echo "🍺 Homebrew formula update would happen here"
+        echo "Version: ${{ steps.version.outputs.version }}"
+        # Note: This would typically push to a homebrew-tap repository
+
+  # Notify on completion
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [release, docker]
+    if: always()
+    
+    steps:
+    - name: Get version from tag
+      id: version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Notify success
+      if: needs.release.result == 'success'
+      run: |
+        echo "🎉 Release ${{ steps.version.outputs.version }} completed successfully!"
+        echo "📦 Binaries available at: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.version }}"
+        
+    - name: Notify failure
+      if: needs.release.result == 'failure'
+      run: |
+        echo "❌ Release ${{ steps.version.outputs.version }} failed!"
+        exit 1
 

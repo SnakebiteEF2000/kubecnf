@@ -1,6 +1,13 @@
 # kubecnf
 
-Add and remove kubeconfigs from the main config file
+### This is fully vibe coded
+
+[![CI](https://github.com/SnakebiteEF2000/kubecnf/workflows/CI/badge.svg)](https://github.com/SnakebiteEF2000/kubecnf/actions/workflows/ci.yml)
+[![Release](https://github.com/SnakebiteEF2000/kubecnf/workflows/Release/badge.svg)](https://github.com/SnakebiteEF2000/kubecnf/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/SnakebiteEF2000/kubecnf)](https://goreportcard.com/report/github.com/SnakebiteEF2000/kubecnf)
+[![Docker](https://img.shields.io/badge/docker-available-blue)](https://github.com/SnakebiteEF2000/kubecnf/pkgs/container/kubecnf)
+
+Add and remove kubeconfigs from the main config file with support for piped input and comprehensive shell completions.
 
 ## Usage
 
@@ -109,3 +116,49 @@ kubecnf completion zsh > ~/.oh-my-zsh/completions/_kubecnf
    ```
 
 Alternatively, you can download the pre-built binary directly from the GitHub [release page](https://github.com/SnakebiteEF2000/kubecnf/releases) rename it and move it to your PATH as shown above.
+
+### Using Docker
+
+```bash
+# Pull and run from GitHub Container Registry
+docker pull ghcr.io/snakebiteef2000/kubecnf:latest
+docker run --rm -v ~/.kube:/root/.kube ghcr.io/snakebiteef2000/kubecnf:latest --help
+```
+
+### Using Makefile (for development)
+
+```bash
+# Install development tools and build
+make dev-setup
+make all
+
+# Install locally
+make install
+```
+
+## 🏗️ Development
+
+For development instructions, testing, and contributing guidelines, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+## 🚀 Features
+
+- ✅ Add kubeconfigs from files or piped input
+- ✅ Remove cluster configurations by name
+- ✅ List all configured clusters
+- ✅ Rollback to previous configurations
+- ✅ Shell completions for bash and zsh
+- ✅ Comprehensive input validation
+- ✅ Automatic backups
+- ✅ Duplicate detection with warnings
+- ✅ Docker container support
+- ✅ Multi-platform releases (Linux, macOS, Windows, FreeBSD)
+
+## 📊 Project Status
+
+This project follows professional development practices:
+
+- 🔄 **Continuous Integration**: Automated testing, linting, and security scanning
+- 📦 **Automated Releases**: Multi-platform binaries and Docker images
+- 🔒 **Security**: Regular security scans and dependency updates
+- 📈 **Code Quality**: Comprehensive linting and test coverage
+- 🤖 **Automation**: Dependabot for dependency management
