@@ -50,15 +50,13 @@ linters-settings:
   misspell:
     locale: US
   mnd:
-    settings:
-      mnd:
-        checks:
-          - argument
-          - case
-          - condition
-          - operation
-          - return
-          - assign
+    checks:
+      - argument
+      - case
+      - condition
+      - operation
+      - return
+      - assign
   nolintlint:
     allow-unused: false
     require-explanation: false
