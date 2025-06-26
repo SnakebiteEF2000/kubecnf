@@ -114,12 +114,12 @@ func TestCheckForDuplicates(t *testing.T) {
 		map[interface{}]interface{}{"name": "cluster2"},
 	}
 
-	new := []interface{}{
+	newItems := []interface{}{
 		map[interface{}]interface{}{"name": "cluster2"}, // duplicate
 		map[interface{}]interface{}{"name": "cluster3"}, // new
 	}
 
-	duplicates := checkForDuplicates(existing, new, "clusters")
+	duplicates := checkForDuplicates(existing, newItems)
 
 	if len(duplicates) != 1 {
 		t.Errorf("Expected 1 duplicate, got %d", len(duplicates))

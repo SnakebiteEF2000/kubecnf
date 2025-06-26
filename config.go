@@ -11,7 +11,12 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-const defaultConfigPath = "~/.kube/config"
+const (
+	defaultConfigPath = "~/.kube/config"
+	// File and directory permissions
+	dirPerm  = 0700 // Owner read/write/execute only
+	filePerm = 0600 // Owner read/write only
+)
 
 func readConfig(path string) (map[string]interface{}, error) {
 	expandedPath := expandPath(path)
@@ -25,7 +30,7 @@ func readConfig(path string) (map[string]interface{}, error) {
 		}
 	}
 
-	data, err := os.ReadFile(expandedPath)
+	data, err := os.ReadFile(expandedPath) //nolint:gosec // Config path is user controlled
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %v", err)
 	}
@@ -53,7 +58,7 @@ func createConfigFromFile(configPath, inputPath string) error {
 	}
 
 	// Read the input file
-	inputData, err := os.ReadFile(inputPath)
+	inputData, err := os.ReadFile(inputPath) //nolint:gosec // File path is user provided
 	if err != nil {
 		return fmt.Errorf("failed to read input file: %v", err)
 	}
@@ -70,12 +75,12 @@ func createConfigFromFile(configPath, inputPath string) error {
 
 	// Create the directory if it doesn't exist
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
 
 	// Write the input file contents to the new config file
-	if err := os.WriteFile(configPath, inputData, 0600); err != nil {
+	if err := os.WriteFile(configPath, inputData, filePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
 
@@ -89,7 +94,7 @@ func writeConfig(path string, config map[string]interface{}) error {
 		return fmt.Errorf("failed to marshal config: %v", err)
 	}
 
-	err = os.WriteFile(path, data, 0600)
+	err = os.WriteFile(path, data, filePerm)
 	if err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
@@ -107,11 +112,11 @@ func backupConfig(path string) (string, error) {
 }
 
 func copyFile(src, dst string) error {
-	input, err := os.ReadFile(src)
+	input, err := os.ReadFile(src) //nolint:gosec // File path is controlled by application
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, input, 0600)
+	return os.WriteFile(dst, input, filePerm)
 }
 
 func getClusterNames(configPath string) ([]string, error) {
@@ -177,22 +182,7 @@ func removeClusterConfig(mainConfigPath, clusterName string) error {
 		return err
 	}
 
-	removed := false
-	for _, key := range []string{"clusters", "contexts", "users"} {
-		if items, ok := config[key].([]interface{}); ok {
-			newItems := make([]interface{}, 0, len(items))
-			for _, item := range items {
-				if m, ok := item.(map[interface{}]interface{}); ok {
-					if m["name"] != clusterName {
-						newItems = append(newItems, item)
-					} else {
-						removed = true
-					}
-				}
-			}
-			config[key] = newItems
-		}
-	}
+	removed := removeClusterFromConfig(config, clusterName)
 
 	if !removed {
 		return fmt.Errorf("cluster %s not found", clusterName)
@@ -205,6 +195,39 @@ func removeClusterConfig(mainConfigPath, clusterName string) error {
 
 	fmt.Printf("Cluster %s removed. Backup created at %s\n", clusterName, backupPath)
 	return nil
+}
+
+// removeClusterFromConfig removes cluster entries from all sections and returns true if any were found
+func removeClusterFromConfig(config map[string]interface{}, clusterName string) bool {
+	removed := false
+	for _, key := range []string{"clusters", "contexts", "users"} {
+		if items, ok := config[key].([]interface{}); ok {
+			newItems, foundInSection := removeClusterFromSection(items, clusterName)
+			config[key] = newItems
+			if foundInSection {
+				removed = true
+			}
+		}
+	}
+	return removed
+}
+
+// removeClusterFromSection removes entries with the given name from a section
+func removeClusterFromSection(items []interface{}, clusterName string) ([]interface{}, bool) {
+	newItems := make([]interface{}, 0, len(items))
+	found := false
+
+	for _, item := range items {
+		if m, ok := item.(map[interface{}]interface{}); ok {
+			if m["name"] != clusterName {
+				newItems = append(newItems, item)
+			} else {
+				found = true
+			}
+		}
+	}
+
+	return newItems, found
 }
 
 func rollbackConfig(mainConfigPath string) error {
@@ -241,12 +264,12 @@ func createConfigFromStdin(configPath string) error {
 
 	// Create the directory if it doesn't exist
 	dir := filepath.Dir(configPath)
-	if err := os.MkdirAll(dir, 0700); err != nil { // More restrictive permissions
+	if err := os.MkdirAll(dir, dirPerm); err != nil {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
 
 	// Write the stdin data to the config file
-	if err := os.WriteFile(configPath, stdinData, 0600); err != nil {
+	if err := os.WriteFile(configPath, stdinData, filePerm); err != nil {
 		return fmt.Errorf("failed to write config file: %v", err)
 	}
 
@@ -356,7 +379,7 @@ func mergeConfigs(mainConfig, newConfig map[string]interface{}) error {
 		if newItems, ok := newConfig[key].([]interface{}); ok {
 			if mainItems, ok := mainConfig[key].([]interface{}); ok {
 				// Check for duplicates and warn
-				duplicates := checkForDuplicates(mainItems, newItems, key)
+				duplicates := checkForDuplicates(mainItems, newItems)
 				if len(duplicates) > 0 {
 					fmt.Printf("Warning: Found duplicate %s names: %v. They will be added anyway.\n", key, duplicates)
 				}
@@ -370,29 +393,39 @@ func mergeConfigs(mainConfig, newConfig map[string]interface{}) error {
 }
 
 // Check for duplicate names in kubeconfig items
-func checkForDuplicates(existing, new []interface{}, itemType string) []string {
+func checkForDuplicates(existing, newItems []interface{}) []string {
+	existingNames := extractNames(existing)
+	return findDuplicateNames(newItems, existingNames)
+}
+
+// extractNames extracts all names from a slice of kubeconfig items
+func extractNames(items []interface{}) map[string]bool {
+	names := make(map[string]bool)
+	for _, item := range items {
+		if name := getItemName(item); name != "" {
+			names[name] = true
+		}
+	}
+	return names
+}
+
+// findDuplicateNames finds names in newItems that already exist in existingNames
+func findDuplicateNames(newItems []interface{}, existingNames map[string]bool) []string {
 	var duplicates []string
-	existingNames := make(map[string]bool)
-
-	// Collect existing names
-	for _, item := range existing {
-		if m, ok := item.(map[interface{}]interface{}); ok {
-			if name, ok := m["name"].(string); ok {
-				existingNames[name] = true
-			}
+	for _, item := range newItems {
+		if name := getItemName(item); name != "" && existingNames[name] {
+			duplicates = append(duplicates, name)
 		}
 	}
-
-	// Check for duplicates in new items
-	for _, item := range new {
-		if m, ok := item.(map[interface{}]interface{}); ok {
-			if name, ok := m["name"].(string); ok {
-				if existingNames[name] {
-					duplicates = append(duplicates, name)
-				}
-			}
-		}
-	}
-
 	return duplicates
+}
+
+// getItemName safely extracts the name from a kubeconfig item
+func getItemName(item interface{}) string {
+	if m, ok := item.(map[interface{}]interface{}); ok {
+		if name, ok := m["name"].(string); ok {
+			return name
+		}
+	}
+	return ""
 }

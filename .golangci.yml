@@ -2,8 +2,6 @@ run:
   timeout: 5m
   issues-exit-code: 1
   tests: true
-  skip-dirs:
-    - vendor
 
 linters-settings:
   dupl:
@@ -39,14 +37,7 @@ linters-settings:
     min-complexity: 15
   goimports:
     local-prefixes: github.com/SnakebiteEF2000/kubecnf
-  golint:
-    min-confidence: 0
-  gomnd:
-    settings:
-      mnd:
-        checks: argument,case,condition,operation,return,assign
   govet:
-    check-shadowing: true
     settings:
       printf:
         funcs:
@@ -58,8 +49,17 @@ linters-settings:
     line-length: 140
   misspell:
     locale: US
+  mnd:
+    settings:
+      mnd:
+        checks:
+          - argument
+          - case
+          - condition
+          - operation
+          - return
+          - assign
   nolintlint:
-    allow-leading-space: true
     allow-unused: false
     require-explanation: false
     require-specific: false
@@ -68,51 +68,43 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
-    - depguard
-    - dogsled
     - dupl
     - errcheck
-    - exportloopref
     - exhaustive
     - funlen
-    - gochecknoinits
+    - gocognit
     - goconst
     - gocritic
     - gocyclo
     - gofmt
     - goimports
-    - gomnd
-    - goprintffuncname
     - gosec
     - gosimple
     - govet
     - ineffassign
     - lll
     - misspell
+    - mnd
     - nakedret
-    - noctx
     - nolintlint
-    - rowserrcheck
     - staticcheck
-    - structcheck
     - stylecheck
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
     - whitespace
 
 issues:
   exclude-rules:
     - path: _test\.go
       linters:
-        - gomnd
+        - mnd
+        - funlen
 
   exclude-use-default: false
   exclude:
-    # Exclude some linters from running on tests files
+    # Exclude some common false positives
     - "G404: Use of weak random number generator"
     - "G306: Expect WriteFile permissions to be 0600 or less"
 
