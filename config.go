@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -223,5 +224,86 @@ func rollbackConfig(mainConfigPath string) error {
 	}
 
 	fmt.Printf("Config rolled back to %s\n", latestBackup)
+	return nil
+}
+
+func createConfigFromStdin(configPath string) error {
+	// Read from stdin
+	stdinData, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("failed to read from stdin: %v", err)
+	}
+
+	if len(stdinData) == 0 {
+		return fmt.Errorf("no data received from stdin")
+	}
+
+	// Validate that the piped data is valid YAML
+	var testConfig map[string]interface{}
+	if err := yaml.Unmarshal(stdinData, &testConfig); err != nil {
+		return fmt.Errorf("invalid YAML data from stdin: %v", err)
+	}
+
+	// Create the directory if it doesn't exist
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	// Write the stdin data to the config file
+	if err := os.WriteFile(configPath, stdinData, 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %v", err)
+	}
+
+	fmt.Printf("Created new config file at %s from piped input\n", configPath)
+	return nil
+}
+
+func addClusterConfigFromStdin(mainConfigPath string) error {
+	// Read main config
+	mainConfig, err := readConfig(mainConfigPath)
+	if err != nil {
+		return err
+	}
+
+	// Read from stdin
+	stdinData, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("failed to read from stdin: %v", err)
+	}
+
+	if len(stdinData) == 0 {
+		return fmt.Errorf("no data received from stdin")
+	}
+
+	// Parse the piped config
+	var newConfig map[string]interface{}
+	if err := yaml.Unmarshal(stdinData, &newConfig); err != nil {
+		return fmt.Errorf("invalid YAML data from stdin: %v", err)
+	}
+
+	// Create backup
+	backupPath, err := backupConfig(mainConfigPath)
+	if err != nil {
+		return err
+	}
+
+	// Merge new config into main config
+	for _, key := range []string{"clusters", "contexts", "users"} {
+		if newItems, ok := newConfig[key].([]interface{}); ok {
+			if mainItems, ok := mainConfig[key].([]interface{}); ok {
+				mainConfig[key] = append(mainItems, newItems...)
+			} else {
+				mainConfig[key] = newItems
+			}
+		}
+	}
+
+	err = writeConfig(mainConfigPath, mainConfig)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("New cluster config added from piped input. Backup created at %s\n", backupPath)
 	return nil
 }

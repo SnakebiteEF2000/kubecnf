@@ -9,25 +9,57 @@ import (
 
 var addCommand = &cli.Command{
 	Name:      "add",
-	Usage:     "add a new cluster config to the main config",
-	ArgsUsage: "<input_file>",
+	Usage:     "add a new cluster config to the main config (from file or piped stdin)",
+	ArgsUsage: "[input_file]",
 	Action: func(c *cli.Context) error {
-		if c.NArg() < 1 {
-			return fmt.Errorf("input file is required")
-		}
 		mainConfigPath := expandPath(c.String("config"))
-		newConfigPath := c.Args().First()
 
-		if _, err := os.Stat(mainConfigPath); os.IsNotExist(err) {
-			fmt.Printf("Main config file not found at %s. Creating it from the input file...\n", mainConfigPath)
-			if err := createConfigFromFile(mainConfigPath, newConfigPath); err != nil {
-				return fmt.Errorf("failed to create main config file: %v", err)
-			}
-			fmt.Printf("Main config file created at %s\n", mainConfigPath)
-			return nil
+		// Check if data is being piped via stdin
+		stdinStat, err := os.Stdin.Stat()
+		if err != nil {
+			return fmt.Errorf("failed to check stdin: %v", err)
 		}
 
-		return addClusterConfig(mainConfigPath, newConfigPath)
+		// Check if stdin is not a character device (i.e., it's piped or redirected)
+		isPiped := (stdinStat.Mode() & os.ModeCharDevice) == 0
+		hasFileArg := c.NArg() >= 1
+
+		// Validate input method
+		if !isPiped && !hasFileArg {
+			return fmt.Errorf("input file is required or pipe kubeconfig data to stdin")
+		}
+
+		if isPiped && hasFileArg {
+			return fmt.Errorf("cannot use both file argument and piped input at the same time")
+		}
+
+		// Handle main config file creation if it doesn't exist
+		if _, err := os.Stat(mainConfigPath); os.IsNotExist(err) {
+			if isPiped {
+				fmt.Printf("Main config file not found at %s. Creating it from piped input...\n", mainConfigPath)
+				if err := createConfigFromStdin(mainConfigPath); err != nil {
+					return fmt.Errorf("failed to create main config file from piped input: %v", err)
+				}
+				fmt.Printf("Main config file created at %s\n", mainConfigPath)
+				return nil
+			} else {
+				fmt.Printf("Main config file not found at %s. Creating it from the input file...\n", mainConfigPath)
+				newConfigPath := c.Args().First()
+				if err := createConfigFromFile(mainConfigPath, newConfigPath); err != nil {
+					return fmt.Errorf("failed to create main config file: %v", err)
+				}
+				fmt.Printf("Main config file created at %s\n", mainConfigPath)
+				return nil
+			}
+		}
+
+		// Add cluster config from piped input or file
+		if isPiped {
+			return addClusterConfigFromStdin(mainConfigPath)
+		} else {
+			newConfigPath := c.Args().First()
+			return addClusterConfig(mainConfigPath, newConfigPath)
+		}
 	},
 }
 
