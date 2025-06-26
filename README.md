@@ -7,9 +7,40 @@ Add and remove kubeconfigs from the main config file
 **Info:** With unspecified config file (-c / --config) default value is used (~/.kube/config)
 
 ### Add a new cluster config
+
+From a file:
 ```
 kubecnf [-c /path/to/main/config] add /path/to/new/cluster/config
 ```
+
+From piped input:
+```
+cat /path/to/new/cluster/config | kubecnf [-c /path/to/main/config] add
+```
+
+```
+kubectl config view --raw | kubecnf [-c /path/to/main/config] add
+```
+
+```
+echo "apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: https://cluster.example.com
+  name: example-cluster
+contexts:
+- context:
+    cluster: example-cluster
+    user: example-user
+  name: example-context
+users:
+- name: example-user
+  user:
+    token: your-token-here" | kubecnf add
+```
+
+**Note:** You cannot use both a file argument and piped input simultaneously.
 
 ### Remove a cluster config
 ```
